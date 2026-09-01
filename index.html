@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>工地雲端每日出工數回報系統</title>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- FontAwesome CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css?v=4.2">
+</head>
+<body>
+  <!-- 背景發光球體，用於玻璃擬態效果 -->
+  <div class="background-decorations">
+    <div class="circle circle-1"></div>
+    <div class="circle circle-2"></div>
+    <div class="circle circle-3"></div>
+  </div>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="glass-card header-bar">
+      <div class="logo">
+        <i class="fa-solid fa-helmet-safety"></i>
+        <h1>工地雲端出工日報系統</h1>
+      </div>
+      <div class="api-status">
+        <span class="status-dot online" id="status-dot"></span>
+        <span id="status-text">正在連線至雲端試算表...</span>
+      </div>
+    </header>
+
+    <!-- Main Layout Grid -->
+    <main class="main-grid">
+      <!-- Left Column: Report Form -->
+      <section class="glass-card form-section">
+        <div class="form-header-tabs">
+          <button type="button" class="form-tab-btn active" id="btn-tab-single">
+            <i class="fa-solid fa-pen-to-square"></i> 單筆回報
+          </button>
+          <button type="button" class="form-tab-btn" id="btn-tab-batch">
+            <i class="fa-solid fa-paste"></i> 智慧批次寫入
+          </button>
+        </div>
+
+        <form id="report-form" class="report-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="input-date"><i class="fa-solid fa-calendar-days"></i> 回報日期</label>
+              <input type="date" id="input-date" required>
+            </div>
+            <div class="form-group">
+              <label for="input-location"><i class="fa-solid fa-location-dot"></i> 工區位置</label>
+              <input type="text" id="input-location" placeholder="請選擇或輸入工區位置…" required autocomplete="off">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="input-subcontractor"><i class="fa-solid fa-building-user"></i> 廠商名稱</label>
+            <input type="text" id="input-subcontractor" placeholder="請輸入或選擇廠商…" required autocomplete="off">
+          </div>
+
+          <div class="form-group">
+            <label for="input-workitem"><i class="fa-solid fa-list-check"></i> 施作工項</label>
+            <input type="text" id="input-workitem" placeholder="請輸入或選擇工項…" required autocomplete="off">
+          </div>
+
+          <div class="form-group relative">
+            <label><i class="fa-solid fa-screwdriver-wrench"></i> 使用機具 (可複選)</label>
+            <div class="multi-select-container">
+              <div id="multi-select-trigger" class="select-trigger-box">
+                <span id="selected-equipments-text">無</span>
+                <i class="fa-solid fa-chevron-down"></i>
+              </div>
+              <div id="multi-select-dropdown" class="select-dropdown-box hidden">
+                <!-- JS dynamic render -->
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="input-amcount"><i class="fa-solid fa-sun"></i> 上午出工數 (人)</label>
+              <input type="number" id="input-amcount" min="0" value="0" required>
+            </div>
+            <div class="form-group">
+              <label for="input-pmcount"><i class="fa-solid fa-moon"></i> 下午出工數 (人)</label>
+              <input type="number" id="input-pmcount" min="0" value="0" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="input-reporter"><i class="fa-solid fa-user-ninja"></i> 回報工程師</label>
+            <input type="text" id="input-reporter" placeholder="請輸入或選擇工程師…" required autocomplete="off">
+          </div>
+
+          <div class="form-group">
+            <label for="input-notes"><i class="fa-solid fa-comment-dots"></i> 作業位置、部位、作業內容說明</label>
+            <textarea id="input-notes" placeholder="輸入當日作業位置、部位、作業內容說明 (如：9F行政棟系統櫃櫃體組裝、2F地磚施作…)" rows="3"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="input-checkitems"><i class="fa-solid fa-list-check"></i> 自檢及查驗事項</label>
+            <textarea id="input-checkitems" placeholder="輸入當日自檢與查驗項目 (如：水溝澆置、鋼筋查驗，無則填無)" rows="2"></textarea>
+          </div>
+
+          <button type="button" class="manage-btn" id="btn-manage-options">
+            <i class="fa-solid fa-gears"></i> 管理常用選單選項
+          </button>
+
+          <button type="submit" class="submit-btn" id="submit-btn">
+            <span class="btn-text"><i class="fa-solid fa-paper-plane"></i> 提交回報資料</span>
+            <span class="spinner hidden"></span>
+          </button>
+        </form>
+
+        <!-- 2. 智慧批次寫入面板 (預設隱藏) -->
+        <div id="batch-form-container" class="batch-form-container hidden">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="batch-input-date"><i class="fa-solid fa-calendar-days"></i> 預設日期</label>
+              <input type="date" id="batch-input-date" required>
+            </div>
+            <div class="form-group">
+              <label for="batch-input-location"><i class="fa-solid fa-location-dot"></i> 預設工區</label>
+              <input type="text" id="batch-input-location" value="食藥署" placeholder="輸入或選擇工區" required autocomplete="off">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="batch-input-reporter"><i class="fa-solid fa-user-ninja"></i> 預設工程師</label>
+              <input type="text" id="batch-input-reporter" value="黃珺騰" placeholder="輸入回報人" required autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label for="batch-input-checkitems"><i class="fa-solid fa-list-check"></i> 預設自檢查驗</label>
+              <input type="text" id="batch-input-checkitems" placeholder="若文字未註明則帶入此項 (無則填無)">
+            </div>
+          </div>
+
+          <!-- 文字貼上解析區塊 -->
+          <div class="batch-text-card">
+            <div class="batch-text-header">
+              <label for="batch-paste-textarea"><i class="fa-solid fa-clipboard-list"></i> LINE/通訊軟體工項通報文字貼上</label>
+              <button type="button" class="batch-parse-btn" id="btn-batch-parse">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> ✨ 智慧解析文字
+              </button>
+            </div>
+            <textarea id="batch-paste-textarea" rows="6" placeholder="請直接貼上 LINE 每日明日工項通報文字...
+範例：
+8/26（三）明日工項：
+0移工：協助景觀、環境整理...：14人
+1.9F行政棟系統櫃櫃體安裝（郅樺）：5人
+...
+明日車輛：新格貨車*1 堆高機*1
+自檢及查驗事項: 龍華街水溝澆置"></textarea>
+          </div>
+
+          <!-- 解析預覽與動態微調表格 -->
+          <div class="batch-preview-section">
+            <div class="batch-preview-header">
+              <h4><i class="fa-solid fa-table-list"></i> 批次出工清單預覽 (<span id="batch-preview-count">0</span> 筆)</h4>
+              <div class="batch-preview-actions">
+                <button type="button" class="btn-batch-add-row" id="btn-batch-add-row">
+                  <i class="fa-solid fa-plus"></i> 加一列
+                </button>
+                <button type="button" class="btn-batch-clear" id="btn-batch-clear">
+                  <i class="fa-solid fa-trash-can"></i> 清空
+                </button>
+              </div>
+            </div>
+
+            <div class="batch-table-wrapper">
+              <table class="batch-table">
+                <thead>
+                  <tr>
+                    <th style="width: 24%;">廠商名稱</th>
+                    <th style="width: 28%;">工項內容</th>
+                    <th style="width: 14%; text-align: center;">出工(人)</th>
+                    <th style="width: 26%;">作業位置、部位、內容說明</th>
+                    <th style="width: 8%; text-align: center;">刪除</th>
+                  </tr>
+                </thead>
+                <tbody id="batch-table-body">
+                  <!-- JS 動態渲染列 -->
+                </tbody>
+              </table>
+              <div id="batch-empty-tip" class="batch-empty-tip">
+                <i class="fa-regular fa-folder-open"></i> 尚未解析任何資料，請在上方貼上文字後點擊「✨ 智慧解析文字」，或點擊「+ 加一列」直接輸入。
+              </div>
+            </div>
+          </div>
+
+          <!-- 送出按鈕與狀態指示 -->
+          <div class="batch-submit-row">
+            <button type="button" class="submit-btn batch-submit-btn" id="btn-batch-submit" disabled>
+              <span class="btn-text"><i class="fa-solid fa-cloud-arrow-up"></i> 確認批次送出至雲端 (<span id="batch-submit-count">0</span> 筆)</span>
+              <span class="spinner hidden" id="batch-spinner"></span>
+            </button>
+            <div id="batch-status-msg" class="batch-status-msg hidden"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Dashboard & Table -->
+      <div class="dashboard-column">
+        <!-- Stats Widgets -->
+        <section class="stats-row">
+          <div class="glass-card stat-card">
+            <div class="stat-icon icon-cyan"><i class="fa-solid fa-users"></i></div>
+            <div class="stat-info">
+              <div class="num" id="stat-total-am">0</div>
+              <div class="label">上午總出工數 (工)</div>
+            </div>
+          </div>
+          <div class="glass-card stat-card">
+            <div class="stat-icon icon-orange"><i class="fa-solid fa-users-viewfinder"></i></div>
+            <div class="stat-info">
+              <div class="num" id="stat-total-pm">0</div>
+              <div class="label">下午總出工數 (工)</div>
+            </div>
+          </div>
+          <div class="glass-card stat-card">
+            <div class="stat-icon icon-green"><i class="fa-solid fa-file-invoice"></i></div>
+            <div class="stat-info">
+              <div class="num" id="stat-report-count">0</div>
+              <div class="label">總回報筆數</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Filters Section -->
+        <section class="glass-card filter-section">
+          <div class="filter-header">
+            <h2><i class="fa-solid fa-sliders"></i> 數據篩選面板</h2>
+            <div class="filter-mode-btns">
+              <button class="filter-mode-btn active" id="btn-mode-daily">單日模式</button>
+              <button class="filter-mode-btn" id="btn-mode-period">期間統計模式</button>
+            </div>
+          </div>
+
+          <div class="filter-controls">
+            <!-- Daily Mode -->
+            <div class="filter-group" id="filter-daily-group">
+              <label for="filter-date"><i class="fa-solid fa-calendar-day"></i> 選擇日期</label>
+              <input type="date" id="filter-date">
+            </div>
+
+            <!-- Period Mode -->
+            <div class="filter-group hidden" id="filter-period-group">
+              <label><i class="fa-solid fa-calendar-week"></i> 選擇日期區間</label>
+              <div class="date-range-inputs">
+                <input type="date" id="filter-start-date">
+                <span>至</span>
+                <input type="date" id="filter-end-date">
+              </div>
+            </div>
+
+            <!-- Global search -->
+            <div class="filter-group">
+              <label for="filter-search"><i class="fa-solid fa-magnifying-glass"></i> 關鍵字搜尋</label>
+              <input type="text" id="filter-search" placeholder="搜尋廠商、工項或回報人…">
+            </div>
+          </div>
+        </section>
+
+        <!-- 工程進度與工期管理卡片 -->
+        <section class="glass-card progress-schedule-card" id="progress-schedule-card">
+          <div class="progress-card-header">
+            <h3><i class="fa-solid fa-bars-progress"></i> 工程進度與工期管理</h3>
+            <div class="progress-status-badge" id="badge-progress-status">尚未設定進度</div>
+          </div>
+          <div class="progress-grid">
+            <div class="progress-field">
+              <label for="input-project-enddate"><i class="fa-solid fa-calendar-check"></i> 預定完工日期</label>
+              <input type="date" id="input-project-enddate">
+            </div>
+            <div class="progress-field">
+              <label><i class="fa-solid fa-hourglass-half"></i> 剩餘工期</label>
+              <div class="progress-calc-val text-cyan" id="val-remaining-days">未設定完工日</div>
+            </div>
+            <div class="progress-field">
+              <label for="input-plan-progress"><i class="fa-solid fa-chart-line"></i> 預定進度 (%)</label>
+              <input type="number" id="input-plan-progress" step="0.01" min="0" max="100" placeholder="例如 45.20">
+            </div>
+            <div class="progress-field">
+              <label for="input-actual-progress"><i class="fa-solid fa-chart-pie"></i> 實際進度 (%)</label>
+              <input type="number" id="input-actual-progress" step="0.01" min="0" max="100" placeholder="例如 46.50">
+            </div>
+            <div class="progress-field">
+              <label><i class="fa-solid fa-scale-balanced"></i> 進度狀態</label>
+              <div class="progress-calc-val" id="val-progress-diff">0.00%</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Weather summary widget (Shown in Daily Mode only) -->
+        <section class="glass-card weather-widget" id="weather-summary-widget">
+          <h3 id="weather-summary-heading"><i class="fa-solid fa-cloud-sun"></i> 今日氣象概要 (自動查詢)</h3>
+          <div class="weather-row" id="weather-row-details">
+            <div class="weather-box" id="weather-box-1">
+              <div class="weather-title" id="weather-am-title"><i class="fa-solid fa-sun text-yellow"></i> 上午天氣</div>
+              <div class="weather-val" id="weather-am-val">無資料</div>
+            </div>
+            <div class="weather-box" id="weather-box-2">
+              <div class="weather-title" id="weather-pm-title"><i class="fa-solid fa-moon text-blue"></i> 下午天氣</div>
+              <div class="weather-val" id="weather-pm-val">無資料</div>
+            </div>
+            <div class="weather-box hidden" id="weather-box-3">
+              <div class="weather-title" id="weather-box3-title"><i class="fa-solid fa-cloud-sun-rain text-cyan"></i> 半日雨天 (下午有雨就計)</div>
+              <div class="weather-val" id="weather-box3-val">無資料</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Visual Charts -->
+        <section class="glass-card charts-section">
+          <h2><i class="fa-solid fa-chart-column"></i> 出工統計圖表</h2>
+          <div class="charts-grid">
+            <div class="chart-container">
+              <canvas id="chart-subcontractors"></canvas>
+            </div>
+            <div class="chart-container">
+              <canvas id="chart-workitems"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- Records Table -->
+        <section class="glass-card table-section">
+          <div class="table-header-row">
+            <h2><i class="fa-solid fa-table-list"></i> 詳細出工明細表</h2>
+            <div class="table-header-actions">
+              <button type="button" id="btn-open-photos-modal" class="photos-btn">
+                <i class="fa-solid fa-camera"></i> 📷 施工照片 (<span id="badge-photo-count">0</span>)
+              </button>
+              <button type="button" id="btn-print-pdf" class="print-pdf-btn">
+                <i class="fa-solid fa-file-pdf"></i> 📄 匯出 PDF 日報表
+              </button>
+              <a id="btn-edit-database" href="#" target="_blank" class="edit-db-btn hidden">
+                <i class="fa-solid fa-file-excel"></i> ✏️ 開啟雲端試算表修改資料
+              </a>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table" id="data-table">
+              <thead>
+                <tr>
+                  <th>日期</th>
+                  <th>工區</th>
+                  <th>廠商名稱</th>
+                  <th>工項</th>
+                  <th>機具</th>
+                  <th>上午 (工)</th>
+                  <th>下午 (工)</th>
+                  <th>上午天氣</th>
+                  <th>下午天氣</th>
+                  <th>回報人</th>
+                  <th>作業位置、部位、作業內容說明</th>
+                  <th>自檢及查驗事項</th>
+                </tr>
+              </thead>
+              <tbody id="table-body">
+                <!-- Javascript Renders -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Options Management Modal -->
+  <div id="options-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-gears"></i> 管理常用選單選項</h3>
+        <button id="modal-close-btn" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="tab-btn active" data-tab="subcontractors">常用廠商</button>
+        <button class="tab-btn" data-tab="workitems">常用工項</button>
+        <button class="tab-btn" data-tab="locations">常用工區</button>
+        <button class="tab-btn" data-tab="equipments">常用機具</button>
+        <button class="tab-btn" data-tab="reporters">常用工程師</button>
+      </div>
+      <div class="modal-body">
+        <div class="add-item-row">
+          <input type="text" id="modal-add-input" placeholder="新增項目名稱…">
+          <button id="modal-add-btn" class="add-btn"><i class="fa-solid fa-plus"></i> 新增</button>
+        </div>
+        <div class="items-list" id="modal-items-list">
+          <!-- JS Renders -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 施工照片上傳管理彈窗 -->
+  <div id="photos-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-card photos-modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-camera-retro"></i> 施工照片上傳與檢附管理</h3>
+        <button id="modal-photos-close-btn" class="close-btn">&times;</button>
+      </div>
+      <div class="photos-modal-body">
+        <div class="photo-upload-zone" id="photo-dropzone">
+          <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+          <p>點擊選取或拖曳施工照片至此處 (支援多張選取)</p>
+          <input type="file" id="input-photo-file" accept="image/*" multiple class="hidden">
+          <button type="button" class="btn-select-photos" id="btn-select-photos">
+            <i class="fa-solid fa-images"></i> 選擇施工照片
+          </button>
+        </div>
+        <div class="photos-preview-header">
+          <h4>已上傳施工照片 (<span id="modal-photo-count">0</span> 張) <small class="text-muted">※ 匯出 PDF 日報時自動檢附於報表末尾</small></h4>
+          <button type="button" class="btn-clear-photos" id="btn-clear-photos">
+            <i class="fa-solid fa-trash-can"></i> 清空照片
+          </button>
+        </div>
+        <div class="photos-grid" id="photos-preview-grid">
+          <div class="photos-empty-tip" id="photos-empty-tip">
+            <i class="fa-regular fa-image"></i> 尚未選取任何施工照片。點擊上方「選擇施工照片」上傳。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 列印專用隱藏區域，匯出 PDF 時顯示 -->
+  <div id="print-area"></div>
+
+  <script src="app.js?v=4.2"></script>
+</body>
+</html>
