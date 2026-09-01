@@ -671,6 +671,10 @@ async function fetchRecords() {
         editDbBtn.classList.remove("hidden");
       }
 
+      if (result.photos) {
+        allCloudPhotos = result.photos;
+      }
+
       updateStatus(true, "連線成功，資料已同步");
       updateDashboard();
     } else {
@@ -857,6 +861,7 @@ function updateDashboard() {
 
   renderTable(filtered);
   renderCharts(filtered);
+  syncPhotosForCurrentDate();
 }
 
 // 根據目前條件過濾日報資料
@@ -1127,10 +1132,12 @@ function updateProgressCalculations() {
   }
 }
 
-// === 施工照片管理模組 ===
+// === 施工照片管理模組 (支援 Google Drive 跨裝置雙向同步) ===
 let constructionPhotos = [];
+let allCloudPhotos = [];
 
 function initPhotosModule() {
+  // 本地快取讀取
   try {
     const saved = sessionStorage.getItem("daily_report_photos");
     if (saved) {
@@ -1145,7 +1152,7 @@ function initPhotosModule() {
   if (btnOpenPhotosModal) {
     btnOpenPhotosModal.addEventListener("click", () => {
       photosModal.classList.remove("hidden");
-      renderPhotosPreview();
+      syncPhotosForCurrentDate();
     });
   }
 
@@ -1194,65 +1201,156 @@ function initPhotosModule() {
   }
 
   if (btnClearPhotos) {
-    btnClearPhotos.addEventListener("click", () => {
-      if (constructionPhotos.length > 0 && confirm("確定要清空所有已上傳的施工照片嗎？")) {
+    btnClearPhotos.addEventListener("click", async () => {
+      if (constructionPhotos.length > 0 && confirm("確定要清空當前日期的所有施工照片嗎？（雲端檔案亦將一併刪除）")) {
+        const toDelete = [...constructionPhotos];
         constructionPhotos = [];
         savePhotosState();
         updatePhotoBadges();
         renderPhotosPreview();
+
+        for (const p of toDelete) {
+          if (p.id && !p.id.startsWith("temp_")) {
+            allCloudPhotos = allCloudPhotos.filter(cp => cp.id !== p.id);
+            fetch(API_URL, {
+              method: "POST",
+              mode: "cors",
+              headers: { "Content-Type": "text/plain" },
+              body: JSON.stringify({ action: "deletePhoto", photoId: p.id })
+            }).catch(e => console.warn(e));
+          }
+        }
       }
     });
   }
 }
 
-function handlePhotoFiles(fileList) {
-  if (!fileList || fileList.length === 0) return;
-  const files = Array.from(fileList);
+// 根據當前選擇之日期，過濾並同步展示雲端照片
+function syncPhotosForCurrentDate() {
+  if (allCloudPhotos.length === 0) return;
+  if (filterMode === "daily") {
+    const curDate = filterDate ? filterDate.value : getTodayString();
+    constructionPhotos = allCloudPhotos.filter(p => p.date === curDate);
+  } else {
+    const sDate = filterStartDate ? filterStartDate.value : "";
+    const eDate = filterEndDate ? filterEndDate.value : "";
+    constructionPhotos = allCloudPhotos.filter(p => {
+      if (sDate && p.date < sDate) return false;
+      if (eDate && p.date > eDate) return false;
+      return true;
+    });
+  }
+  savePhotosState();
+  updatePhotoBadges();
+  renderPhotosPreview();
+}
 
-  files.forEach(file => {
-    if (!file.type.startsWith("image/")) return;
-
+function readFileAsDataUrl(file) {
+  return new Promise((resolve) => {
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const maxDim = 1200;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
-        const defaultCaption = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-
-        constructionPhotos.push({
-          id: Date.now() + "_" + Math.random().toString(36).substr(2, 6),
-          dataUrl: compressedDataUrl,
-          caption: defaultCaption
-        });
-
-        savePhotosState();
-        updatePhotoBadges();
-        renderPhotosPreview();
-      };
-      img.src = event.target.result;
-    };
+    reader.onload = (e) => resolve(e.target.result);
     reader.readAsDataURL(file);
   });
+}
+
+function compressImage(dataUrl, maxDim = 1200, quality = 0.85) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.src = dataUrl;
+  });
+}
+
+async function handlePhotoFiles(fileList) {
+  if (!fileList || fileList.length === 0) return;
+  const files = Array.from(fileList);
+  const targetDate = (filterDate && filterDate.value) ? filterDate.value : getTodayString();
+
+  for (const file of files) {
+    if (!file.type.startsWith("image/")) continue;
+
+    const dataUrl = await readFileAsDataUrl(file);
+    const compressedDataUrl = await compressImage(dataUrl, 1200, 0.85);
+    const defaultCaption = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+
+    const tempId = "temp_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+    const tempItem = {
+      id: tempId,
+      date: targetDate,
+      dataUrl: compressedDataUrl,
+      viewUrl: compressedDataUrl,
+      caption: defaultCaption,
+      isUploading: true
+    };
+
+    constructionPhotos.push(tempItem);
+    savePhotosState();
+    updatePhotoBadges();
+    renderPhotosPreview();
+
+    // 背景上傳至 Google Drive
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        mode: "cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: "uploadPhoto",
+          date: targetDate,
+          caption: defaultCaption,
+          fileName: file.name,
+          imageBase64: compressedDataUrl,
+          mimeType: "image/jpeg"
+        })
+      });
+
+      const result = await res.json();
+      if (result.status === "success" && result.photo) {
+        tempItem.id = result.photo.id;
+        tempItem.fileId = result.photo.fileId;
+        tempItem.driveUrl = result.photo.driveUrl;
+        tempItem.viewUrl = result.photo.viewUrl;
+        tempItem.isUploading = false;
+
+        const existingIdx = allCloudPhotos.findIndex(p => p.id === tempItem.id);
+        if (existingIdx === -1) {
+          allCloudPhotos.push(result.photo);
+        } else {
+          allCloudPhotos[existingIdx] = result.photo;
+        }
+      } else {
+        tempItem.isUploading = false;
+        if (result.message && (result.message.includes("DriveApp") || result.message.includes("權限"))) {
+          alert("⚠️ Google Drive 雲端照片存取權限尚未授權：\n照片已暫存於本機，可在 GAS 編輯器選取 authDrive 函式執行授權以啟用跨裝置同步。");
+        }
+      }
+    } catch (uploadErr) {
+      console.warn("Upload error:", uploadErr);
+      tempItem.isUploading = false;
+    }
+
+    savePhotosState();
+    updatePhotoBadges();
+    renderPhotosPreview();
+  }
 }
 
 function savePhotosState() {
@@ -1274,9 +1372,10 @@ function renderPhotosPreview() {
   photosPreviewGrid.innerHTML = "";
 
   if (constructionPhotos.length === 0) {
+    const curDate = filterDate ? filterDate.value : '今日';
     photosPreviewGrid.innerHTML = `
       <div class="photos-empty-tip" id="photos-empty-tip">
-        <i class="fa-regular fa-image"></i> 尚未選取任何施工照片。點擊上方「選擇施工照片」或拖曳照片上傳。
+        <i class="fa-regular fa-image"></i> 目前（${curDate}）尚無雲端施工照片。點擊上方「選擇施工照片」或拖曳照片上傳。
       </div>
     `;
     return;
@@ -1285,24 +1384,68 @@ function renderPhotosPreview() {
   constructionPhotos.forEach((photo, idx) => {
     const card = document.createElement("div");
     card.className = "photo-item-card";
+    
+    const statusBadge = photo.isUploading 
+      ? `<div class="photo-uploading-badge"><i class="fa-solid fa-spinner fa-spin"></i> 雲端同步中...</div>`
+      : (photo.fileId ? `<div class="photo-cloud-badge"><i class="fa-brands fa-google-drive"></i> 已同步雲端</div>` : '');
+
     card.innerHTML = `
-      <img src="${photo.dataUrl}" class="photo-item-thumb" alt="照片 ${idx + 1}">
+      <img src="${photo.dataUrl || photo.viewUrl}" class="photo-item-thumb" alt="照片 ${idx + 1}" onerror="this.src='${photo.dataUrl || ''}'">
+      ${statusBadge}
       <input type="text" class="photo-item-caption" value="${photo.caption || ''}" placeholder="輸入照片圖說說明...">
       <button type="button" class="photo-item-del-btn" title="刪除照片">&times;</button>
     `;
 
     const captionInput = card.querySelector(".photo-item-caption");
-    captionInput.addEventListener("input", (e) => {
-      photo.caption = e.target.value;
+    captionInput.addEventListener("change", async (e) => {
+      const newCap = e.target.value.trim();
+      photo.caption = newCap;
       savePhotosState();
+
+      if (photo.fileId || (photo.id && !photo.id.startsWith("temp_"))) {
+        try {
+          fetch(API_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({
+              action: "updatePhotoCaption",
+              photoId: photo.id,
+              caption: newCap
+            })
+          });
+        } catch (err) {
+          console.warn("Caption update error:", err);
+        }
+      }
     });
 
     const delBtn = card.querySelector(".photo-item-del-btn");
-    delBtn.addEventListener("click", () => {
-      constructionPhotos = constructionPhotos.filter(p => p.id !== photo.id);
+    delBtn.addEventListener("click", async () => {
+      if (!confirm("確定要刪除這張施工照片嗎？（雲端檔案亦將一併移除）")) return;
+
+      const pId = photo.id;
+      constructionPhotos = constructionPhotos.filter(p => p.id !== pId);
+      allCloudPhotos = allCloudPhotos.filter(p => p.id !== pId);
       savePhotosState();
       updatePhotoBadges();
       renderPhotosPreview();
+
+      if (pId && !pId.startsWith("temp_")) {
+        try {
+          await fetch(API_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({
+              action: "deletePhoto",
+              photoId: pId
+            })
+          });
+        } catch (err) {
+          console.warn("Delete error:", err);
+        }
+      }
     });
 
     photosPreviewGrid.appendChild(card);
@@ -1522,7 +1665,7 @@ function handlePrintPdf() {
         <div class="print-photos-grid">
           ${constructionPhotos.map((p, idx) => `
             <div class="print-photo-card">
-              <img src="${p.dataUrl}" class="print-photo-img" alt="照片 ${idx + 1}">
+              <img src="${p.dataUrl || p.viewUrl}" class="print-photo-img" alt="照片 ${idx + 1}" crossorigin="anonymous">
               <div class="print-photo-caption">圖 ${idx + 1}：${p.caption || "現場施工照片"}</div>
             </div>
           `).join("")}
