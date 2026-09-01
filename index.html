@@ -6,9 +6,11 @@
   <title>工地雲端每日出工數回報系統</title>
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- html2pdf.js CDN 用於手機/PAD直接下載PDF檔案 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <!-- FontAwesome CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=4.2">
+  <link rel="stylesheet" href="style.css?v=4.3">
 </head>
 <body>
   <!-- 背景發光球體，用於玻璃擬態效果 -->
@@ -282,15 +284,15 @@
             </div>
             <div class="progress-field">
               <label for="input-plan-progress"><i class="fa-solid fa-chart-line"></i> 預定進度 (%)</label>
-              <input type="number" id="input-plan-progress" step="0.01" min="0" max="100" placeholder="例如 45.20">
+              <input type="number" id="input-plan-progress" step="0.0001" min="0" max="100" placeholder="例如 45.1234">
             </div>
             <div class="progress-field">
               <label for="input-actual-progress"><i class="fa-solid fa-chart-pie"></i> 實際進度 (%)</label>
-              <input type="number" id="input-actual-progress" step="0.01" min="0" max="100" placeholder="例如 46.50">
+              <input type="number" id="input-actual-progress" step="0.0001" min="0" max="100" placeholder="例如 46.5678">
             </div>
             <div class="progress-field">
               <label><i class="fa-solid fa-scale-balanced"></i> 進度狀態</label>
-              <div class="progress-calc-val" id="val-progress-diff">0.00%</div>
+              <div class="progress-calc-val" id="val-progress-diff">0.0000%</div>
             </div>
           </div>
         </section>
@@ -428,9 +430,30 @@
     </div>
   </div>
 
+  <!-- 日報表全螢幕預覽與直接下載彈窗 (支援手機、PAD、筆電直接下載 PDF 檔案) -->
+  <div id="report-preview-modal" class="modal-overlay hidden">
+    <div class="modal-card glass-card report-preview-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-file-pdf"></i> 工地出工日報表 - 預覽與匯出</h3>
+        <div class="preview-actions">
+          <button type="button" class="btn-download-pdf" id="btn-download-pdf">
+            <i class="fa-solid fa-download"></i> 📥 直接下載 PDF 檔案
+          </button>
+          <button type="button" class="btn-system-print" id="btn-system-print">
+            <i class="fa-solid fa-print"></i> 🖨️ 系統列印
+          </button>
+          <button id="modal-report-close-btn" class="close-btn">&times;</button>
+        </div>
+      </div>
+      <div class="report-preview-body" id="report-preview-body">
+        <!-- JS 動態填入預覽內容 -->
+      </div>
+    </div>
+  </div>
+
   <!-- 列印專用隱藏區域，匯出 PDF 時顯示 -->
   <div id="print-area"></div>
 
-  <script src="app.js?v=4.2"></script>
+  <script src="app.js?v=4.3"></script>
 </body>
 </html>

@@ -675,6 +675,23 @@ async function fetchRecords() {
         allCloudPhotos = result.photos;
       }
 
+      // 雲端工程進度同步 (跨裝置同步)
+      if (result.schedule) {
+        if (result.schedule.finishDate && inputProjectEndDate) {
+          inputProjectEndDate.value = result.schedule.finishDate;
+          localStorage.setItem("daily_report_schedule_enddate", result.schedule.finishDate);
+        }
+        if (result.schedule.planPercent !== undefined && inputPlanProgress) {
+          inputPlanProgress.value = parseFloat(result.schedule.planPercent).toFixed(4);
+          localStorage.setItem("daily_report_plan_progress", result.schedule.planPercent);
+        }
+        if (result.schedule.actualPercent !== undefined && inputActualProgress) {
+          inputActualProgress.value = parseFloat(result.schedule.actualPercent).toFixed(4);
+          localStorage.setItem("daily_report_actual_progress", result.schedule.actualPercent);
+        }
+        updateProgressCalculations();
+      }
+
       updateStatus(true, "連線成功，資料已同步");
       updateDashboard();
     } else {
@@ -1055,22 +1072,53 @@ function initScheduleAndProgress() {
 
   updateProgressCalculations();
 
+  // 監聽並自動同步至雲端與本地快取
+  let syncScheduleTimer = null;
+  function triggerCloudScheduleSync() {
+    clearTimeout(syncScheduleTimer);
+    syncScheduleTimer = setTimeout(async () => {
+      const finishDate = inputProjectEndDate ? inputProjectEndDate.value : "";
+      const planPercent = inputPlanProgress && inputPlanProgress.value !== "" ? parseFloat(inputPlanProgress.value) : 0;
+      const actualPercent = inputActualProgress && inputActualProgress.value !== "" ? parseFloat(inputActualProgress.value) : 0;
+
+      localStorage.setItem("daily_report_schedule_enddate", finishDate);
+      localStorage.setItem("daily_report_plan_progress", planPercent);
+      localStorage.setItem("daily_report_actual_progress", actualPercent);
+
+      try {
+        fetch(API_URL, {
+          method: "POST",
+          mode: "cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            action: "updateSchedule",
+            finishDate: finishDate,
+            planPercent: planPercent,
+            actualPercent: actualPercent
+          })
+        });
+      } catch (e) {
+        console.warn("Schedule cloud sync error:", e);
+      }
+    }, 600);
+  }
+
   if (inputProjectEndDate) {
     inputProjectEndDate.addEventListener("change", () => {
-      localStorage.setItem("daily_report_schedule_enddate", inputProjectEndDate.value);
       updateProgressCalculations();
+      triggerCloudScheduleSync();
     });
   }
   if (inputPlanProgress) {
     inputPlanProgress.addEventListener("input", () => {
-      localStorage.setItem("daily_report_plan_progress", inputPlanProgress.value);
       updateProgressCalculations();
+      triggerCloudScheduleSync();
     });
   }
   if (inputActualProgress) {
     inputActualProgress.addEventListener("input", () => {
-      localStorage.setItem("daily_report_actual_progress", inputActualProgress.value);
       updateProgressCalculations();
+      triggerCloudScheduleSync();
     });
   }
 }
@@ -1103,7 +1151,7 @@ function updateProgressCalculations() {
     valRemainingDays.className = "progress-calc-val";
   }
 
-  // 2. 超前或落後 % 計算
+  // 2. 超前或落後 % 計算 (精確至小數點 4 位)
   const planVal = inputPlanProgress && inputPlanProgress.value !== "" ? parseFloat(inputPlanProgress.value) : null;
   const actualVal = inputActualProgress && inputActualProgress.value !== "" ? parseFloat(inputActualProgress.value) : null;
 
@@ -1111,21 +1159,21 @@ function updateProgressCalculations() {
     const diff = actualVal - planVal;
     if (diff >= 0) {
       // 若值為正者只顯示超前
-      const aheadStr = `超前 ${diff.toFixed(2)}%`;
+      const aheadStr = `超前 ${diff.toFixed(4)}%`;
       valProgressDiff.textContent = aheadStr;
       valProgressDiff.style.color = "#2ecc71";
       badgeProgressStatus.textContent = aheadStr;
       badgeProgressStatus.className = "progress-status-badge status-ahead";
     } else {
       // 若值為負者只顯示落後
-      const behindStr = `落後 ${Math.abs(diff).toFixed(2)}%`;
+      const behindStr = `落後 ${Math.abs(diff).toFixed(4)}%`;
       valProgressDiff.textContent = behindStr;
       valProgressDiff.style.color = "#ff5252";
       badgeProgressStatus.textContent = behindStr;
       badgeProgressStatus.className = "progress-status-badge status-behind";
     }
   } else {
-    valProgressDiff.textContent = "0.00%";
+    valProgressDiff.textContent = "0.0000%";
     valProgressDiff.style.color = "#fff";
     badgeProgressStatus.textContent = "尚未設定進度";
     badgeProgressStatus.className = "progress-status-badge";
@@ -1621,8 +1669,7 @@ function handlePrintPdf() {
     : "食藥大樓興建工程 - 施工日報表";
   const reportType = filterMode === "period" ? "PDF 期間出工彙總表" : "PDF 格式日報";
 
-  const printArea = document.getElementById("print-area");
-  printArea.innerHTML = `
+  const reportContent = `
     <div class="print-header">
       <h1>${reportTitle}</h1>
     </div>
@@ -1633,8 +1680,8 @@ function handlePrintPdf() {
       <div class="print-meta-item"><strong>報表輸出：</strong>${reportType}</div>
       <div class="print-meta-item"><strong>預定完工日：</strong>${inputProjectEndDate && inputProjectEndDate.value ? inputProjectEndDate.value : "未設定"}</div>
       <div class="print-meta-item"><strong>剩餘工期：</strong>${valRemainingDays ? valRemainingDays.textContent : "-"}</div>
-      <div class="print-meta-item"><strong>預定進度：</strong>${inputPlanProgress && inputPlanProgress.value !== "" ? inputPlanProgress.value + "%" : "-"}</div>
-      <div class="print-meta-item"><strong>實際進度：</strong>${inputActualProgress && inputActualProgress.value !== "" ? inputActualProgress.value + "%" : "-"} (${badgeProgressStatus ? badgeProgressStatus.textContent : "-"})</div>
+      <div class="print-meta-item"><strong>預定進度：</strong>${inputPlanProgress && inputPlanProgress.value !== "" ? parseFloat(inputPlanProgress.value).toFixed(4) + "%" : "-"}</div>
+      <div class="print-meta-item"><strong>實際進度：</strong>${inputActualProgress && inputActualProgress.value !== "" ? parseFloat(inputActualProgress.value).toFixed(4) + "%" : "-"} (${badgeProgressStatus ? badgeProgressStatus.textContent : "-"})</div>
     </div>
     
     ${checkContainerHtml}
@@ -1673,9 +1720,83 @@ function handlePrintPdf() {
       </div>
     ` : ""}
   `;
-  
-  // 7. 呼叫瀏覽器原生列印 (可直接另存成 PDF)
-  window.print();
+
+  // 1. 同步寫入系統列印專用隱藏容器 (供桌面快捷列印)
+  const printArea = document.getElementById("print-area");
+  if (printArea) {
+    printArea.innerHTML = reportContent;
+  }
+
+  // 2. 開啟預覽彈窗 (支援手機、PAD 與桌面即時預覽與直接下載 PDF)
+  const previewModal = document.getElementById("report-preview-modal");
+  const previewBody = document.getElementById("report-preview-body");
+  if (previewModal && previewBody) {
+    previewBody.innerHTML = `
+      <div class="report-paper" id="report-paper-container">
+        ${reportContent}
+      </div>
+    `;
+    previewModal.classList.remove("hidden");
+
+    // 綁定「📥 直接下載 PDF 檔案」按鈕
+    const btnDownloadPdf = document.getElementById("btn-download-pdf");
+    if (btnDownloadPdf) {
+      btnDownloadPdf.onclick = async () => {
+        const element = document.getElementById("report-paper-container");
+        if (!element || typeof html2pdf === "undefined") {
+          window.print();
+          return;
+        }
+
+        const originalText = btnDownloadPdf.innerHTML;
+        btnDownloadPdf.disabled = true;
+        btnDownloadPdf.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 正在生成 PDF...`;
+
+        const filename = `${filterMode === "daily" ? filterDate.value : (filterStartDate.value + "_" + filterEndDate.value)}_工地出工日報.pdf`;
+        const opt = {
+          margin: [8, 8, 8, 8],
+          filename: filename,
+          image: { type: "jpeg", quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true, logging: false },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+        };
+
+        try {
+          await html2pdf().set(opt).from(element).save();
+        } catch (e) {
+          console.warn("html2pdf error, fallback to print:", e);
+          window.print();
+        } finally {
+          btnDownloadPdf.disabled = false;
+          btnDownloadPdf.innerHTML = originalText;
+        }
+      };
+    }
+
+    // 綁定「🖨️ 系統列印」按鈕
+    const btnSystemPrint = document.getElementById("btn-system-print");
+    if (btnSystemPrint) {
+      btnSystemPrint.onclick = () => {
+        window.print();
+      };
+    }
+
+    // 綁定關閉按鈕
+    const closeBtn = document.getElementById("modal-report-close-btn");
+    if (closeBtn) {
+      closeBtn.onclick = () => {
+        previewModal.classList.add("hidden");
+      };
+    }
+    previewModal.onclick = (e) => {
+      if (e.target === previewModal) {
+        previewModal.classList.add("hidden");
+      }
+    };
+  } else {
+    // 若無彈窗容器則回退原廠列印
+    window.print();
+  }
 }
 
 // 初始化自定義 Autocomplete 下拉選單 (取代原生 datalist，使樣式完全可控、防行動端版面擠壓)
