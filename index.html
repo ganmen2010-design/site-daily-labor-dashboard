@@ -10,7 +10,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <!-- FontAwesome CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=5.0">
+  <link rel="stylesheet" href="style.css?v=5.1">
 </head>
 <body>
   <!-- 背景發光球體，用於玻璃擬態效果 -->
@@ -27,24 +27,47 @@
         <i class="fa-solid fa-helmet-safety"></i>
         <h1>工地雲端出工日報系統</h1>
       </div>
-      <div class="api-status">
-        <span class="status-dot online" id="status-dot"></span>
-        <span id="status-text">正在連線至雲端試算表...</span>
+      <div class="header-right-tools">
+        <!-- 左右雙向側邊欄收合控制組 -->
+        <div class="pane-toggle-group">
+          <button type="button" class="pane-toggle-btn" id="btn-toggle-left" title="收合或展開左側回報表單">
+            <i class="fa-solid fa-angles-left"></i> <span id="text-toggle-left">收合左側</span>
+          </button>
+          <button type="button" class="pane-toggle-btn" id="btn-toggle-right" title="收合或展開右側戰情儀表">
+            <span id="text-toggle-right">收合右側</span> <i class="fa-solid fa-angles-right"></i>
+          </button>
+        </div>
+        <div class="api-status">
+          <span class="status-dot online" id="status-dot"></span>
+          <span id="status-text">正在連線至雲端試算表...</span>
+        </div>
       </div>
     </header>
 
     <!-- Main Layout Grid -->
     <main class="main-grid">
       <!-- Left Column: Report Form -->
-      <section class="glass-card form-section">
-        <div class="form-header-tabs">
-          <button type="button" class="form-tab-btn active" id="btn-tab-single">
-            <i class="fa-solid fa-pen-to-square"></i> 單筆回報
-          </button>
-          <button type="button" class="form-tab-btn" id="btn-tab-batch">
-            <i class="fa-solid fa-paste"></i> 智慧批次寫入
-          </button>
+      <section class="glass-card form-section" id="form-section">
+        <!-- 左側收合後展示的垂直展開條 (Dock Bar) -->
+        <div class="collapsed-strip-bar left-strip hidden" id="strip-expand-left" title="點擊展開左側回報表單">
+          <i class="fa-solid fa-angles-right"></i>
+          <span class="vertical-title">展開回報表單</span>
         </div>
+
+        <div class="form-section-inner" id="form-section-inner">
+          <div class="form-header-tabs-wrapper">
+            <div class="form-header-tabs">
+              <button type="button" class="form-tab-btn active" id="btn-tab-single">
+                <i class="fa-solid fa-pen-to-square"></i> 單筆回報
+              </button>
+              <button type="button" class="form-tab-btn" id="btn-tab-batch">
+                <i class="fa-solid fa-paste"></i> 智慧批次寫入
+              </button>
+            </div>
+            <button type="button" class="section-collapse-btn" id="btn-card-collapse-left" title="收合左側表單">
+              <i class="fa-solid fa-chevron-left"></i> <span>收合</span>
+            </button>
+          </div>
 
         <form id="report-form" class="report-form">
           <div class="form-row">
@@ -203,10 +226,24 @@
             <div id="batch-status-msg" class="batch-status-msg hidden"></div>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- Right Column: Dashboard & Table -->
-      <div class="dashboard-column">
+    <!-- Right Column: Dashboard & Table -->
+    <div class="dashboard-column" id="dashboard-column">
+      <!-- 右側收合後展示的垂直展開條 (Dock Bar) -->
+      <div class="collapsed-strip-bar right-strip hidden" id="strip-expand-right" title="點擊展開右側戰情儀表">
+        <i class="fa-solid fa-angles-left"></i>
+        <span class="vertical-title">展開戰情儀表</span>
+      </div>
+
+      <div class="dashboard-column-inner" id="dashboard-column-inner">
+        <!-- 頂部收合右側按鈕條 -->
+        <div class="dashboard-top-bar">
+          <button type="button" class="section-collapse-btn" id="btn-card-collapse-right" title="收合右側戰情">
+            <span>收合右側戰情</span> <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
         <!-- Stats Widgets -->
         <section class="stats-row">
           <div class="glass-card stat-card">
@@ -376,6 +413,7 @@
             </table>
           </div>
         </section>
+        </div>
       </div>
     </main>
   </div>
@@ -461,6 +499,6 @@
   <!-- 列印專用隱藏區域，匯出 PDF 時顯示 -->
   <div id="print-area"></div>
 
-  <script src="app.js?v=5.0"></script>
+  <script src="app.js?v=5.1"></script>
 </body>
 </html>

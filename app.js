@@ -209,6 +209,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // 初始化施工照片檢附模組
   initPhotosModule();
 
+  // 初始化雙向側邊欄收合功能 (左側表單收合 / 右側戰情收合)
+  initPaneCollapse();
+
   // 載入資料
   fetchRecords();
 });
@@ -223,6 +226,123 @@ function formatDateString(date) {
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+// === 雙向側邊欄收合控制邏輯 (左側表單收合 / 右側戰情收合) ===
+let isLeftCollapsed = false;
+let isRightCollapsed = false;
+
+function initPaneCollapse() {
+  const mainGrid = document.querySelector(".main-grid");
+  const btnToggleLeft = document.getElementById("btn-toggle-left");
+  const btnToggleRight = document.getElementById("btn-toggle-right");
+  const textToggleLeft = document.getElementById("text-toggle-left");
+  const textToggleRight = document.getElementById("text-toggle-right");
+  
+  const btnCardCollapseLeft = document.getElementById("btn-card-collapse-left");
+  const btnCardCollapseRight = document.getElementById("btn-card-collapse-right");
+  
+  const stripExpandLeft = document.getElementById("strip-expand-left");
+  const stripExpandRight = document.getElementById("strip-expand-right");
+
+  function resizeCharts() {
+    setTimeout(() => {
+      if (subChartInstance) subChartInstance.resize();
+      if (itemChartInstance) itemChartInstance.resize();
+      window.dispatchEvent(new Event("resize"));
+    }, 320);
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem("dailyReport_pane_state", JSON.stringify({
+        left: isLeftCollapsed,
+        right: isRightCollapsed
+      }));
+    } catch(e) {}
+  }
+
+  function setLeftCollapsed(collapsed, autoSave = true) {
+    if (!mainGrid) return;
+    isLeftCollapsed = collapsed;
+    if (isLeftCollapsed) {
+      mainGrid.classList.add("left-collapsed");
+      if (btnToggleLeft) {
+        btnToggleLeft.classList.add("active-collapsed");
+        if (textToggleLeft) textToggleLeft.textContent = "展開左側";
+        const icon = btnToggleLeft.querySelector("i");
+        if (icon) icon.className = "fa-solid fa-angles-right";
+      }
+      // 若右邊也處於收合狀態，則自動展開右邊，保證視野不為空
+      if (isRightCollapsed) {
+        setRightCollapsed(false, false);
+      }
+    } else {
+      mainGrid.classList.remove("left-collapsed");
+      if (btnToggleLeft) {
+        btnToggleLeft.classList.remove("active-collapsed");
+        if (textToggleLeft) textToggleLeft.textContent = "收合左側";
+        const icon = btnToggleLeft.querySelector("i");
+        if (icon) icon.className = "fa-solid fa-angles-left";
+      }
+    }
+    if (autoSave) saveState();
+    resizeCharts();
+  }
+
+  function setRightCollapsed(collapsed, autoSave = true) {
+    if (!mainGrid) return;
+    isRightCollapsed = collapsed;
+    if (isRightCollapsed) {
+      mainGrid.classList.add("right-collapsed");
+      if (btnToggleRight) {
+        btnToggleRight.classList.add("active-collapsed");
+        if (textToggleRight) textToggleRight.textContent = "展開右側";
+        const icon = btnToggleRight.querySelector("i");
+        if (icon) icon.className = "fa-solid fa-angles-left";
+      }
+      // 若左邊也處於收合狀態，則自動展開左邊，保證視野不為空
+      if (isLeftCollapsed) {
+        setLeftCollapsed(false, false);
+      }
+    } else {
+      mainGrid.classList.remove("right-collapsed");
+      if (btnToggleRight) {
+        btnToggleRight.classList.remove("active-collapsed");
+        if (textToggleRight) textToggleRight.textContent = "收合右側";
+        const icon = btnToggleRight.querySelector("i");
+        if (icon) icon.className = "fa-solid fa-angles-right";
+      }
+    }
+    if (autoSave) saveState();
+    resizeCharts();
+  }
+
+  if (btnToggleLeft) {
+    btnToggleLeft.addEventListener("click", () => setLeftCollapsed(!isLeftCollapsed));
+  }
+  if (btnToggleRight) {
+    btnToggleRight.addEventListener("click", () => setRightCollapsed(!isRightCollapsed));
+  }
+  if (btnCardCollapseLeft) {
+    btnCardCollapseLeft.addEventListener("click", () => setLeftCollapsed(true));
+  }
+  if (btnCardCollapseRight) {
+    btnCardCollapseRight.addEventListener("click", () => setRightCollapsed(true));
+  }
+  if (stripExpandLeft) {
+    stripExpandLeft.addEventListener("click", () => setLeftCollapsed(false));
+  }
+  if (stripExpandRight) {
+    stripExpandRight.addEventListener("click", () => setRightCollapsed(false));
+  }
+
+  // 讀取先前儲存之狀態 (預設兩邊均展開)
+  try {
+    const savedState = JSON.parse(localStorage.getItem("dailyReport_pane_state") || "{}");
+    if (savedState.left) setLeftCollapsed(true, false);
+    else if (savedState.right) setRightCollapsed(true, false);
+  } catch(e) {}
 }
 
 // 讀取與設定常用選單至 LocalStorage
