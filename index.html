@@ -10,7 +10,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <!-- FontAwesome CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=4.3">
+  <link rel="stylesheet" href="style.css?v=5.0">
 </head>
 <body>
   <!-- 背景發光球體，用於玻璃擬態效果 -->
@@ -210,17 +210,24 @@
         <!-- Stats Widgets -->
         <section class="stats-row">
           <div class="glass-card stat-card">
-            <div class="stat-icon icon-cyan"><i class="fa-solid fa-users"></i></div>
+            <div class="stat-icon icon-cyan"><i class="fa-solid fa-sun"></i></div>
             <div class="stat-info">
-              <div class="num" id="stat-total-am">0</div>
-              <div class="label">上午總出工數 (工)</div>
+              <div class="num" id="stat-total-am">0.0</div>
+              <div class="label">上午出工 (半天工)</div>
             </div>
           </div>
           <div class="glass-card stat-card">
-            <div class="stat-icon icon-orange"><i class="fa-solid fa-users-viewfinder"></i></div>
+            <div class="stat-icon icon-orange"><i class="fa-solid fa-moon"></i></div>
             <div class="stat-info">
-              <div class="num" id="stat-total-pm">0</div>
-              <div class="label">下午總出工數 (工)</div>
+              <div class="num" id="stat-total-pm">0.0</div>
+              <div class="label">下午出工 (半天工)</div>
+            </div>
+          </div>
+          <div class="glass-card stat-card stat-card-highlight">
+            <div class="stat-icon icon-purple"><i class="fa-solid fa-user-check"></i></div>
+            <div class="stat-info">
+              <div class="num text-purple" id="stat-total-fullday">0.0</div>
+              <div class="label">實際總工數 (整天計 / 半天÷2)</div>
             </div>
           </div>
           <div class="glass-card stat-card">
@@ -454,6 +461,6 @@
   <!-- 列印專用隱藏區域，匯出 PDF 時顯示 -->
   <div id="print-area"></div>
 
-  <script src="app.js?v=4.3"></script>
+  <script src="app.js?v=5.0"></script>
 </body>
 </html>

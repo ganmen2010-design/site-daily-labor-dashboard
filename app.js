@@ -114,6 +114,7 @@ const submitText = submitBtn.querySelector(".btn-text");
 // 統計數值
 const statTotalAm = document.getElementById("stat-total-am");
 const statTotalPm = document.getElementById("stat-total-pm");
+const statTotalFullDay = document.getElementById("stat-total-fullday");
 const statReportCount = document.getElementById("stat-report-count");
 
 // 篩選欄位
@@ -828,8 +829,16 @@ function updateDashboard() {
     totalAm += r.amCount;
     totalPm += r.pmCount;
   });
-  statTotalAm.textContent = (totalAm * 0.5).toFixed(1);
-  statTotalPm.textContent = (totalPm * 0.5).toFixed(1);
+  const amHalf = totalAm * 0.5;
+  const pmHalf = totalPm * 0.5;
+  const totalHalf = amHalf + pmHalf;
+  const totalFullDay = totalHalf / 2;
+
+  statTotalAm.textContent = amHalf.toFixed(1);
+  statTotalPm.textContent = pmHalf.toFixed(1);
+  if (statTotalFullDay) {
+    statTotalFullDay.textContent = totalFullDay.toFixed(1);
+  }
   statReportCount.textContent = filtered.length;
 
   if (filterMode === "daily") {
@@ -1619,10 +1628,15 @@ function handlePrintPdf() {
         notesDisplay = notesArr.map((n, idx) => `${idx + 1}. ${n}`).join("<br>");
       }
 
+      const halfW = data.totalWorkers;
+      const fullW = halfW / 2;
       tableRowsHtml += `
         <tr>
           <td><strong>${sub}</strong></td>
-          <td style="text-align: center; font-weight: bold;">${data.totalWorkers.toFixed(1)} 工</td>
+          <td style="text-align: center; vertical-align: middle;">
+            <div style="font-weight: bold; font-size: 13.5px; color: #1e293b;">${halfW.toFixed(1)} 工 <span style="font-size: 11px; font-weight: normal; color: #64748b;">(半天)</span></div>
+            <div style="font-size: 11.5px; color: #0284c7; font-weight: 700; margin-top: 3px; background: #e0f2fe; padding: 2px 4px; border-radius: 4px; display: inline-block;">折合 ${fullW.toFixed(1)} 整天</div>
+          </td>
           <td><div style="line-height: 1.45;">${notesDisplay}</div></td>
         </tr>
       `;
@@ -1642,10 +1656,15 @@ function handlePrintPdf() {
         noteDisplay = r.workItem || r.notes || "-";
       }
 
+      const halfW = totalWorkers;
+      const fullW = halfW / 2;
       tableRowsHtml += `
         <tr>
           <td><strong>${subDisplay}</strong></td>
-          <td style="text-align: center;">${totalWorkers.toFixed(1)} 工</td>
+          <td style="text-align: center; vertical-align: middle;">
+            <div style="font-weight: bold; font-size: 13.5px; color: #1e293b;">${halfW.toFixed(1)} 工 <span style="font-size: 11px; font-weight: normal; color: #64748b;">(半天)</span></div>
+            <div style="font-size: 11.5px; color: #0284c7; font-weight: 700; margin-top: 3px; background: #e0f2fe; padding: 2px 4px; border-radius: 4px; display: inline-block;">折合 ${fullW.toFixed(1)} 整天</div>
+          </td>
           <td>${noteDisplay}</td>
         </tr>
       `;
@@ -1678,6 +1697,8 @@ function handlePrintPdf() {
       <div class="print-meta-item"><strong>申報日期：</strong>${dateText}</div>
       <div class="print-meta-item"><strong>今日天氣：</strong>${weatherText}</div>
       <div class="print-meta-item"><strong>報表輸出：</strong>${reportType}</div>
+      <div class="print-meta-item"><strong>出工加總：</strong><strong>${grandTotalWorkers.toFixed(1)} 工 (半天計)</strong></div>
+      <div class="print-meta-item" style="color: #0284c7;"><strong>實際總工數：</strong><strong>${(grandTotalWorkers / 2).toFixed(1)} 工 (整天計，除以 2)</strong></div>
       <div class="print-meta-item"><strong>預定完工日：</strong>${inputProjectEndDate && inputProjectEndDate.value ? inputProjectEndDate.value : "未設定"}</div>
       <div class="print-meta-item"><strong>剩餘工期：</strong>${valRemainingDays ? valRemainingDays.textContent : "-"}</div>
       <div class="print-meta-item"><strong>預定進度：</strong>${inputPlanProgress && inputPlanProgress.value !== "" ? parseFloat(inputPlanProgress.value).toFixed(4) + "%" : "-"}</div>
@@ -1690,18 +1711,23 @@ function handlePrintPdf() {
       <thead>
         <tr>
           <th style="width: 25%;">${(filterMode === "period" && isSingleSubcontractor) ? "日期 / 廠商名稱" : "廠商名稱"}</th>
-          <th style="width: 15%; text-align: center;">出工數 (工)</th>
-          <th style="width: 60%;">${(filterMode === "period" && !isSingleSubcontractor) ? "作業位置、部位、作業內容說明 (彙整)" : "作業位置、部位、作業內容說明"}</th>
+          <th style="width: 20%; text-align: center;">出工數<br><span style="font-size: 11px; font-weight: normal; color: #475569;">(半天累計 / 折合整天)</span></th>
+          <th style="width: 55%;">${(filterMode === "period" && !isSingleSubcontractor) ? "作業位置、部位、作業內容說明 (彙整)" : "作業位置、部位、作業內容說明"}</th>
         </tr>
       </thead>
       <tbody>
         ${tableRowsHtml}
       </tbody>
       <tfoot>
-        <tr style="background: #f5f5f5; font-weight: bold;">
-          <td>出工總計</td>
-          <td style="text-align: center;">${grandTotalWorkers.toFixed(1)} 工</td>
-          <td>${filterMode === "period" ? (isSingleSubcontractor ? "期間單一廠商各工項出工加總" : "期間內各廠商出工加總") : "當日出工加總"}</td>
+        <tr style="background: #f8fafc; font-weight: bold; border-top: 2px solid #cbd5e1;">
+          <td style="color: #334155;">出工總計 (半天計)</td>
+          <td style="text-align: center; font-size: 14px; color: #1e293b;">${grandTotalWorkers.toFixed(1)} 工 (半天)</td>
+          <td style="color: #64748b; font-size: 12.5px;">${filterMode === "period" ? (isSingleSubcontractor ? "期間單一廠商各工項半天出工累計" : "期間內各廠商半天出工加總") : "當日半天出工加總"}</td>
+        </tr>
+        <tr style="background: #f0f9ff; font-weight: bold; border-top: 1.5px solid #0284c7;">
+          <td style="color: #0369a1; font-size: 13.5px;"><i class="fa-solid fa-calculator"></i> 實際總工數 (整天計)</td>
+          <td style="text-align: center; font-size: 15px; font-weight: 800; color: #0284c7;">${(grandTotalWorkers / 2).toFixed(1)} 工 (整天)</td>
+          <td style="color: #0369a1; font-size: 12.5px;"><strong>※ 依工程實務計算：若以整天（全日工）計算，須除以 2 才是實際總工數</strong>（${grandTotalWorkers.toFixed(1)} ÷ 2 = ${(grandTotalWorkers / 2).toFixed(1)} 工）</td>
         </tr>
       </tfoot>
     </table>
@@ -1756,8 +1782,13 @@ function handlePrintPdf() {
         const opt = {
           margin: [8, 8, 8, 8],
           filename: filename,
-          image: { type: "jpeg", quality: 0.95 },
-          html2canvas: { scale: 2, useCORS: true, logging: false },
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { 
+            scale: 2, 
+            useCORS: true, 
+            logging: false,
+            backgroundColor: "#ffffff"
+          },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
         };
 

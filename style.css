@@ -257,8 +257,14 @@ body {
 /* Stats Widgets Row */
 .stats-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  .stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 640px) {
@@ -271,7 +277,13 @@ body {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 18px 24px;
+  padding: 18px 20px;
+}
+
+.stat-card-highlight {
+  border: 1px solid rgba(168, 85, 247, 0.4) !important;
+  background: rgba(168, 85, 247, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(168, 85, 247, 0.15);
 }
 
 .stat-icon {
@@ -296,10 +308,20 @@ body {
   border: 1px solid rgba(232, 100, 58, 0.2);
 }
 
+.icon-purple {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
 .icon-green {
   background: rgba(129, 199, 132, 0.12);
   color: #81c784;
   border: 1px solid rgba(129, 199, 132, 0.2);
+}
+
+.text-purple {
+  color: #d8b4fe !important;
 }
 
 .stat-info .num {
@@ -1031,8 +1053,185 @@ input[type="date"] {
   display: none;
 }
 
+/* === PDF 報表畫布與列印共用樣式 (同時支援彈窗預覽、html2pdf 擷取與瀏覽器列印，強制純白底、防黑底覆蓋) === */
+.report-paper,
+#print-area {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  box-sizing: border-box;
+}
+
+.report-paper .print-header,
+#print-area .print-header {
+  text-align: center;
+  margin-bottom: 18px;
+  border-bottom: 2px solid #0f172a;
+  padding-bottom: 12px;
+}
+
+.report-paper .print-header h1,
+#print-area .print-header h1 {
+  font-size: 24px;
+  margin: 0 0 6px 0;
+  font-weight: 800;
+  color: #0f172a !important;
+  letter-spacing: 0.5px;
+}
+
+.report-paper .print-meta-grid,
+#print-area .print-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+  font-size: 13.5px;
+  border-bottom: 1px dashed #94a3b8;
+  padding-bottom: 12px;
+  color: #1e293b !important;
+}
+
+.report-paper .print-meta-item,
+#print-area .print-meta-item {
+  line-height: 1.5;
+  color: #1e293b !important;
+}
+
+.report-paper .print-meta-item strong,
+#print-area .print-meta-item strong {
+  color: #0f172a !important;
+}
+
+.report-paper .print-check-container,
+#print-area .print-check-container {
+  margin-bottom: 16px;
+  border: 1px solid #cbd5e1;
+  padding: 10px 14px;
+  border-radius: 4px;
+  background: #f8fafc !important;
+  color: #1e293b !important;
+}
+
+.report-paper .print-check-title,
+#print-area .print-check-title {
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 4px;
+  color: #0f172a !important;
+}
+
+.report-paper .print-check-item,
+#print-area .print-check-item {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #334155 !important;
+  padding-left: 12px;
+  text-indent: -12px;
+}
+
+/* 列印與 PDF 表格：徹底避免任何暗色背景覆蓋 */
+.report-paper .print-table,
+#print-area .print-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 14px;
+  font-size: 13px;
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.report-paper .print-table th, 
+.report-paper .print-table td,
+#print-area .print-table th, 
+#print-area .print-table td {
+  border: 1px solid #cbd5e1 !important;
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: middle;
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.report-paper .print-table th,
+#print-area .print-table th {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  font-weight: 700;
+  font-size: 13.5px;
+  text-align: center;
+}
+
+.report-paper .print-table tbody tr:nth-child(even) td,
+#print-area .print-table tbody tr:nth-child(even) td {
+  background: #fcfcfd !important;
+}
+
+.report-paper .print-table tfoot tr,
+#print-area .print-table tfoot tr {
+  font-weight: bold;
+}
+
+.report-paper .print-table tfoot td,
+#print-area .print-table tfoot td {
+  padding: 10px 12px;
+}
+
+.report-paper .print-photos-section,
+#print-area .print-photos-section {
+  margin-top: 24px;
+  page-break-before: auto;
+}
+
+.report-paper .print-photos-title,
+#print-area .print-photos-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #0f172a !important;
+  margin-bottom: 10px;
+  border-bottom: 2px solid #0f172a;
+  padding-bottom: 4px;
+}
+
+.report-paper .print-photos-grid,
+#print-area .print-photos-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.report-paper .print-photo-card,
+#print-area .print-photo-card {
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 6px;
+  background: #ffffff !important;
+  page-break-inside: avoid;
+  text-align: center;
+}
+
+.report-paper .print-photo-img,
+#print-area .print-photo-img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+  margin-bottom: 6px;
+  border-radius: 2px;
+}
+
+.report-paper .print-photo-caption,
+#print-area .print-photo-caption {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155 !important;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
 @media print {
-  /* Hide all dashboard layout elements */
+  /* 瀏覽器原生列印專用隱藏與頁面調整 */
   body {
     background: #fff !important;
     color: #000 !important;
@@ -1054,139 +1253,6 @@ input[type="date"] {
     width: 100%;
     margin: 0;
     padding: 0;
-  }
-  
-  .print-header {
-    text-align: center;
-    margin-bottom: 20px;
-    border-bottom: 2px solid #000;
-    padding-bottom: 10px;
-  }
-  
-  .print-header h1 {
-    font-size: 26px;
-    margin: 0 0 8px 0;
-    font-weight: bold;
-    color: #000;
-  }
-  
-  .print-meta-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 15px;
-    font-size: 15px;
-    border-bottom: 1px dashed #000;
-    padding-bottom: 10px;
-  }
-  
-  .print-meta-item {
-    line-height: 1.5;
-  }
-  
-  .print-check-container {
-    margin-bottom: 20px;
-    border: 1px solid #000;
-    padding: 10px 14px;
-    border-radius: 4px;
-    background: #fafafa;
-  }
-  
-  .print-check-title {
-    font-weight: bold;
-    font-size: 15px;
-    margin-bottom: 6px;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 4px;
-  }
-  
-  .print-check-item {
-    font-size: 14px;
-    line-height: 1.5;
-    padding-left: 12px;
-    text-indent: -12px;
-  }
-  
-  .print-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 15px;
-    font-size: 14px;
-  }
-  
-  .print-table th, 
-  .print-table td {
-    border: 1px solid #000;
-    padding: 10px 12px;
-    text-align: left;
-    vertical-align: middle;
-  }
-  
-  .print-table th {
-    background: #eaeaea !important;
-    color: #000 !important;
-    font-weight: bold;
-  }
-  
-  .print-table td {
-    color: #000 !important;
-  }
-
-  .print-progress-grid {
-    display: grid;
-    grid-template-columns: 1.2fr 1fr 1.8fr;
-    gap: 8px;
-    margin-bottom: 15px;
-    padding: 8px 12px;
-    background: #fdfdfd;
-    border: 1px solid #000;
-    border-radius: 4px;
-    font-size: 13.5px;
-  }
-
-  .print-photos-section {
-    margin-top: 25px;
-    page-break-before: auto;
-  }
-
-  .print-photos-title {
-    font-size: 16px;
-    font-weight: bold;
-    color: #000;
-    margin-bottom: 12px;
-    border-bottom: 2px solid #000;
-    padding-bottom: 4px;
-  }
-
-  .print-photos-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-  }
-
-  .print-photo-card {
-    border: 1px solid #888;
-    border-radius: 4px;
-    padding: 6px;
-    background: #fff;
-    page-break-inside: avoid;
-    text-align: center;
-  }
-
-  .print-photo-img {
-    width: 100%;
-    height: 200px;
-    object-fit: cover;
-    display: block;
-    margin-bottom: 6px;
-  }
-
-  .print-photo-caption {
-    font-size: 12.5px;
-    font-weight: bold;
-    color: #000;
-    line-height: 1.4;
-    word-break: break-all;
   }
 }
 
@@ -1934,22 +2000,22 @@ input[type="date"] {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
-  background: #1f242d;
+  background: #0b0f19;
   display: flex;
   justify-content: center;
   -webkit-overflow-scrolling: touch;
 }
 
-/* 擬真 A4 報表畫布容器 */
+/* 擬真 A4 報表畫布容器 (強制純白紙張、不透色、防黑底) */
 .report-paper {
-  background: #ffffff;
-  color: #000000;
+  background: #ffffff !important;
+  color: #0f172a !important;
   width: 100%;
-  max-width: 820px;
+  max-width: 840px;
   min-height: 100%;
-  padding: 28px 32px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-  border-radius: 4px;
+  padding: 36px 42px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  border-radius: 6px;
   box-sizing: border-box;
 }
 
