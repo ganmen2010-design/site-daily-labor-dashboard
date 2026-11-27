@@ -206,6 +206,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // 初始化工程進度與工期管理
   initScheduleAndProgress();
 
+  // 初始化資料維護模組 (修改/刪除已報資料)
+  initEditRecordModule();
+
   // 初始化施工照片檢附模組
   initPhotosModule();
 
@@ -815,6 +818,9 @@ async function fetchRecords() {
 
       updateStatus(true, "連線成功，資料已同步");
       updateDashboard();
+      if (typeof populateEditRecordDropdown === "function") {
+        populateEditRecordDropdown();
+      }
     } else {
       throw new Error(result.message);
     }
@@ -884,6 +890,9 @@ async function handleFormSubmit(e) {
       renderEquipmentCheckboxes();
       
       await fetchRecords();
+      if (typeof populateEditRecordDropdown === "function") {
+        populateEditRecordDropdown();
+      }
     } else {
       throw new Error(result.message);
     }
@@ -1044,13 +1053,23 @@ function getFilteredRecords() {
 function renderTable(records) {
   tableBody.innerHTML = "";
   if (records.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="12" class="text-center">查無符合條件的出工記錄</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="13" class="text-center">查無符合條件的出工記錄</td></tr>`;
     return;
   }
 
-  records.forEach(r => {
+  records.forEach((r, idx) => {
     const tr = document.createElement("tr");
+    tr.dataset.rowId = r.rowId || "";
+    tr.dataset.index = idx;
     tr.innerHTML = `
+      <td class="text-center table-action-cell">
+        <button type="button" class="btn-row-action btn-row-edit" title="編輯此筆出工紀錄" data-row-id="${r.rowId || ''}">
+          <i class="fa-solid fa-pen"></i> 修改
+        </button>
+        <button type="button" class="btn-row-action btn-row-delete" title="刪除此筆出工紀錄" data-row-id="${r.rowId || ''}">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </td>
       <td>${r.date}</td>
       <td><span class="badge">${r.location}</span></td>
       <td><strong>${r.subcontractor}</strong></td>
@@ -1064,6 +1083,30 @@ function renderTable(records) {
       <td><div class="notes-cell" title="${r.notes}">${r.notes || "-"}</div></td>
       <td><div class="check-cell" title="${r.checkItems || '無'}">${(r.checkItems || "無").replace(/[；;]+/g, "<br>")}</div></td>
     `;
+
+    // 綁定行內按鈕點擊事件
+    const btnEdit = tr.querySelector(".btn-row-edit");
+    const btnDel = tr.querySelector(".btn-row-delete");
+
+    if (btnEdit) {
+      btnEdit.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openRecordInEditForm(r);
+      });
+    }
+
+    if (btnDel) {
+      btnDel.addEventListener("click", (e) => {
+        e.stopPropagation();
+        confirmAndDeleteRecord(r);
+      });
+    }
+
+    // 雙擊整列亦可快速載入修改
+    tr.addEventListener("dblclick", () => {
+      openRecordInEditForm(r);
+    });
+
     tableBody.appendChild(tr);
   });
 }
@@ -2407,6 +2450,11 @@ function initBatchSubmission() {
         // 重新整理儀表板數據
         await fetchRecords();
 
+        // 同步更新維護選單
+        if (typeof populateEditRecordDropdown === "function") {
+          populateEditRecordDropdown();
+        }
+
         // 自動切換儀表板日期至該天以利檢視
         filterDate.value = defaultDate;
         filterMode = "daily";
@@ -2431,6 +2479,459 @@ function initBatchSubmission() {
     }
   });
 }
+
+// =========================================================================
+// === 資料維護模組 (修改/刪除已報資料 - Tab 3) ===
+// =========================================================================
+
+let editSelectedEquipments = ["無"];
+
+function initEditRecordModule() {
+  const btnTabSingle = document.getElementById("btn-tab-single");
+  const btnTabBatch = document.getElementById("btn-tab-batch");
+  const btnTabEdit = document.getElementById("btn-tab-edit");
+
+  const singleForm = document.getElementById("report-form");
+  const batchContainer = document.getElementById("batch-form-container");
+  const editContainer = document.getElementById("edit-form-container");
+
+  const recordSelect = document.getElementById("edit-record-select");
+  const fieldsWrapper = document.getElementById("edit-fields-wrapper");
+
+  const btnSave = document.getElementById("btn-edit-save");
+  const btnDelete = document.getElementById("btn-edit-delete");
+  const btnCancel = document.getElementById("btn-edit-cancel");
+
+  const saveSpinner = document.getElementById("edit-save-spinner");
+  const deleteSpinner = document.getElementById("edit-delete-spinner");
+
+  // 初始化 Autocomplete 給編輯欄位
+  makeAutocomplete(document.getElementById("edit-input-location"), "locations");
+  makeAutocomplete(document.getElementById("edit-input-subcontractor"), "subcontractors");
+  makeAutocomplete(document.getElementById("edit-input-workitem"), "workitems");
+  makeAutocomplete(document.getElementById("edit-input-reporter"), "reporters");
+
+  // 廠商與作業內容聯動工項 (修改表單)
+  const editSub = document.getElementById("edit-input-subcontractor");
+  const editWork = document.getElementById("edit-input-workitem");
+  const editNotes = document.getElementById("edit-input-notes");
+
+  function triggerEditAutoWorkItem() {
+    if (!editSub || !editWork) return;
+    const autoItem = detectWorkItem(editSub.value, editNotes ? editNotes.value : "");
+    if (autoItem && autoItem !== "無") {
+      editWork.value = autoItem;
+    }
+  }
+
+  if (editSub) {
+    editSub.addEventListener("input", triggerEditAutoWorkItem);
+    editSub.addEventListener("change", triggerEditAutoWorkItem);
+  }
+
+  // 機具多選設定
+  setupEditEquipmentSelector();
+
+  // 頁籤切換監聽
+  if (btnTabEdit) {
+    btnTabEdit.addEventListener("click", () => {
+      btnTabSingle.classList.remove("active");
+      btnTabBatch.classList.remove("active");
+      btnTabEdit.classList.add("active");
+
+      singleForm.classList.add("hidden");
+      batchContainer.classList.add("hidden");
+      editContainer.classList.remove("hidden");
+
+      populateEditRecordDropdown();
+    });
+  }
+
+  // 切換回單筆
+  if (btnTabSingle) {
+    btnTabSingle.addEventListener("click", () => {
+      btnTabSingle.classList.add("active");
+      btnTabBatch.classList.remove("active");
+      btnTabEdit.classList.remove("active");
+
+      singleForm.classList.remove("hidden");
+      batchContainer.classList.add("hidden");
+      editContainer.classList.add("hidden");
+      clearRowHighlights();
+    });
+  }
+
+  // 切換回批次
+  if (btnTabBatch) {
+    btnTabBatch.addEventListener("click", () => {
+      btnTabSingle.classList.remove("active");
+      btnTabBatch.classList.add("active");
+      btnTabEdit.classList.remove("active");
+
+      singleForm.classList.add("hidden");
+      batchContainer.classList.remove("hidden");
+      editContainer.classList.add("hidden");
+      clearRowHighlights();
+    });
+  }
+
+  // 選單變更監聽
+  if (recordSelect) {
+    recordSelect.addEventListener("change", () => {
+      const selectedId = recordSelect.value;
+      if (!selectedId) {
+        fieldsWrapper.classList.add("hidden");
+        clearRowHighlights();
+        return;
+      }
+
+      const rec = allRecords.find(r => String(r.rowId) === String(selectedId) || (r.timestamp && r.timestamp === selectedId));
+      if (rec) {
+        loadRecordIntoEditFields(rec);
+        highlightTableRow(rec.rowId);
+      }
+    });
+  }
+
+  // 取消/重設
+  if (btnCancel) {
+    btnCancel.addEventListener("click", () => {
+      recordSelect.value = "";
+      fieldsWrapper.classList.add("hidden");
+      clearRowHighlights();
+    });
+  }
+
+  // 儲存修改
+  if (btnSave) {
+    btnSave.addEventListener("click", async () => {
+      const rowId = document.getElementById("edit-row-id").value;
+      if (!rowId) {
+        alert("請先選取欲修改的紀錄！");
+        return;
+      }
+
+      const payload = {
+        action: "updateRecord",
+        rowId: parseInt(rowId),
+        date: document.getElementById("edit-input-date").value,
+        location: document.getElementById("edit-input-location").value.trim(),
+        subcontractor: document.getElementById("edit-input-subcontractor").value.trim(),
+        workItem: document.getElementById("edit-input-workitem").value.trim(),
+        equipment: editSelectedEquipments.join(", "),
+        amCount: parseInt(document.getElementById("edit-input-amcount").value) || 0,
+        pmCount: parseInt(document.getElementById("edit-input-pmcount").value) || 0,
+        reporter: document.getElementById("edit-input-reporter").value.trim(),
+        notes: document.getElementById("edit-input-notes").value.trim(),
+        checkItems: document.getElementById("edit-input-checkitems").value.trim() || "無",
+        originalDate: document.getElementById("edit-original-date").value,
+        originalSubcontractor: document.getElementById("edit-original-sub").value,
+        originalWorkItem: document.getElementById("edit-original-work").value,
+        timestamp: document.getElementById("edit-timestamp").value
+      };
+
+      if (!payload.date || !payload.location || !payload.subcontractor || !payload.workItem) {
+        alert("請完整填寫日期、工區、廠商與工項！");
+        return;
+      }
+
+      btnSave.disabled = true;
+      btnDelete.disabled = true;
+      saveSpinner.classList.remove("hidden");
+
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          mode: "cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await res.json();
+        if (result.status === "success") {
+          alert("日報記錄修改成功！");
+          learnNewInputs(payload.subcontractor, payload.workItem, payload.equipment, payload.location, payload.reporter);
+          await fetchRecords();
+          populateEditRecordDropdown();
+          
+          // 自動聚焦該紀錄
+          recordSelect.value = String(payload.rowId);
+          highlightTableRow(payload.rowId);
+        } else {
+          throw new Error(result.message || "更新失敗");
+        }
+      } catch (err) {
+        alert("修改失敗，原因：" + err.message);
+      } finally {
+        btnSave.disabled = false;
+        btnDelete.disabled = false;
+        saveSpinner.classList.add("hidden");
+      }
+    });
+  }
+
+  // 刪除此筆資料
+  if (btnDelete) {
+    btnDelete.addEventListener("click", () => {
+      const rowId = document.getElementById("edit-row-id").value;
+      if (!rowId) {
+        alert("請先選取欲刪除的紀錄！");
+        return;
+      }
+
+      const rec = allRecords.find(r => String(r.rowId) === String(rowId));
+      if (rec) {
+        confirmAndDeleteRecord(rec);
+      } else {
+        const dummyRec = {
+          rowId: parseInt(rowId),
+          date: document.getElementById("edit-input-date").value,
+          subcontractor: document.getElementById("edit-input-subcontractor").value,
+          workItem: document.getElementById("edit-input-workitem").value,
+          timestamp: document.getElementById("edit-timestamp").value
+        };
+        confirmAndDeleteRecord(dummyRec);
+      }
+    });
+  }
+}
+
+// 填充維護選單
+function populateEditRecordDropdown() {
+  const recordSelect = document.getElementById("edit-record-select");
+  if (!recordSelect) return;
+
+  const currentVal = recordSelect.value;
+  recordSelect.innerHTML = `<option value="">-- 請選擇欲維護之日報記錄 (共 ${allRecords.length} 筆) --</option>`;
+
+  allRecords.forEach(r => {
+    const opt = document.createElement("option");
+    opt.value = r.rowId || r.timestamp;
+    const am = (r.amCount * 0.5).toFixed(1);
+    const pm = (r.pmCount * 0.5).toFixed(1);
+    opt.textContent = `[${r.date}] ${r.subcontractor} | ${r.workItem} (上${am}/下${pm}工) - ${r.reporter}`;
+    recordSelect.appendChild(opt);
+  });
+
+  if (currentVal && allRecords.some(r => String(r.rowId) === String(currentVal) || r.timestamp === currentVal)) {
+    recordSelect.value = currentVal;
+  }
+}
+
+// 機具多選 (修改表單)
+function setupEditEquipmentSelector() {
+  const trigger = document.getElementById("edit-multi-select-trigger");
+  const dropdown = document.getElementById("edit-multi-select-dropdown");
+  const textDisplay = document.getElementById("edit-selected-equipments-text");
+
+  if (!trigger || !dropdown) return;
+
+  function renderEditEquipmentCheckboxes() {
+    dropdown.innerHTML = "";
+    customOptions.equipments.forEach(eq => {
+      const label = document.createElement("label");
+      label.className = "checkbox-item";
+      const isChecked = editSelectedEquipments.includes(eq);
+      label.innerHTML = `
+        <input type="checkbox" value="${eq}" ${isChecked ? "checked" : ""}>
+        <span>${eq}</span>
+      `;
+
+      const input = label.querySelector("input");
+      input.addEventListener("change", (e) => {
+        const val = e.target.value;
+        if (val === "無") {
+          editSelectedEquipments = ["無"];
+        } else {
+          if (editSelectedEquipments.includes("無")) {
+            editSelectedEquipments = editSelectedEquipments.filter(x => x !== "無");
+          }
+          if (e.target.checked) {
+            if (!editSelectedEquipments.includes(val)) editSelectedEquipments.push(val);
+          } else {
+            editSelectedEquipments = editSelectedEquipments.filter(x => x !== val);
+          }
+        }
+        if (editSelectedEquipments.length === 0) {
+          editSelectedEquipments = ["無"];
+        }
+        textDisplay.textContent = editSelectedEquipments.join(", ");
+        renderEditEquipmentCheckboxes();
+      });
+
+      dropdown.appendChild(label);
+    });
+  }
+
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    renderEditEquipmentCheckboxes();
+    dropdown.classList.toggle("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!trigger.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.classList.add("hidden");
+    }
+  });
+}
+
+// 將特定日報紀錄填入修改表單
+function loadRecordIntoEditFields(record) {
+  const fieldsWrapper = document.getElementById("edit-fields-wrapper");
+  if (!fieldsWrapper) return;
+
+  fieldsWrapper.classList.remove("hidden");
+
+  document.getElementById("edit-row-id").value = record.rowId || "";
+  document.getElementById("edit-original-date").value = record.date || "";
+  document.getElementById("edit-original-sub").value = record.subcontractor || "";
+  document.getElementById("edit-original-work").value = record.workItem || "";
+  document.getElementById("edit-timestamp").value = record.timestamp || "";
+
+  document.getElementById("edit-input-date").value = record.date || "";
+  document.getElementById("edit-input-location").value = record.location || "";
+  document.getElementById("edit-input-subcontractor").value = record.subcontractor || "";
+  document.getElementById("edit-input-workitem").value = record.workItem || "";
+  document.getElementById("edit-input-amcount").value = record.amCount || 0;
+  document.getElementById("edit-input-pmcount").value = record.pmCount || 0;
+  document.getElementById("edit-input-reporter").value = record.reporter || "";
+  document.getElementById("edit-input-notes").value = record.notes || "";
+  document.getElementById("edit-input-checkitems").value = record.checkItems || "";
+
+  // 機具解析
+  if (record.equipment && record.equipment.trim()) {
+    editSelectedEquipments = record.equipment.split(/[,，、]+/).map(s => s.trim()).filter(Boolean);
+    if (editSelectedEquipments.length === 0) editSelectedEquipments = ["無"];
+  } else {
+    editSelectedEquipments = ["無"];
+  }
+  document.getElementById("edit-selected-equipments-text").textContent = editSelectedEquipments.join(", ");
+}
+
+// 由右側表格或其他處直通開啟左側維護表單
+function openRecordInEditForm(record) {
+  // 1. 若左側收合中，自動展開左側
+  const mainGrid = document.querySelector(".main-grid");
+  const stripLeft = document.getElementById("strip-expand-left");
+  const textToggleLeft = document.getElementById("text-toggle-left");
+  if (mainGrid && mainGrid.classList.contains("collapsed-left")) {
+    mainGrid.classList.remove("collapsed-left");
+    if (stripLeft) stripLeft.classList.add("hidden");
+    if (textToggleLeft) textToggleLeft.textContent = "收合左側";
+    localStorage.setItem("daily_report_left_collapsed", "false");
+  }
+
+  // 2. 切換至 Tab 3「修改/刪除已報」
+  const btnTabSingle = document.getElementById("btn-tab-single");
+  const btnTabBatch = document.getElementById("btn-tab-batch");
+  const btnTabEdit = document.getElementById("btn-tab-edit");
+  const singleForm = document.getElementById("report-form");
+  const batchContainer = document.getElementById("batch-form-container");
+  const editContainer = document.getElementById("edit-form-container");
+
+  if (btnTabSingle && btnTabBatch && btnTabEdit) {
+    btnTabSingle.classList.remove("active");
+    btnTabBatch.classList.remove("active");
+    btnTabEdit.classList.add("active");
+  }
+  if (singleForm) singleForm.classList.add("hidden");
+  if (batchContainer) batchContainer.classList.add("hidden");
+  if (editContainer) editContainer.classList.remove("hidden");
+
+  // 3. 填充選單並選中該項目
+  populateEditRecordDropdown();
+  const recordSelect = document.getElementById("edit-record-select");
+  if (recordSelect) {
+    recordSelect.value = record.rowId || record.timestamp;
+  }
+
+  // 4. 載入資料至欄位
+  loadRecordIntoEditFields(record);
+  highlightTableRow(record.rowId);
+
+  // 5. 滾動左側頂部
+  editContainer.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// 表格高亮指定列
+function highlightTableRow(rowId) {
+  clearRowHighlights();
+  if (!rowId) return;
+  const rows = document.querySelectorAll("#table-body tr");
+  rows.forEach(tr => {
+    if (String(tr.dataset.rowId) === String(rowId)) {
+      tr.classList.add("highlight-editing");
+    }
+  });
+}
+
+function clearRowHighlights() {
+  const rows = document.querySelectorAll("#table-body tr.highlight-editing");
+  rows.forEach(tr => tr.classList.remove("highlight-editing"));
+}
+
+// 確認並刪除紀錄
+async function confirmAndDeleteRecord(record) {
+  const am = (record.amCount * 0.5).toFixed(1);
+  const pm = (record.pmCount * 0.5).toFixed(1);
+  const confirmMsg = `確定要永久刪除此筆出工紀錄嗎？\n\n【日期】${record.date}\n【工區】${record.location || '食藥署'}\n【廠商】${record.subcontractor}\n【工項】${record.workItem}\n【出工數】上午 ${am} 工 / 下午 ${pm} 工\n【回報人】${record.reporter}\n\n⚠️ 刪除後將從雲端資料庫直接移除，無法復原。`;
+
+  if (!confirm(confirmMsg)) {
+    return;
+  }
+
+  const btnSave = document.getElementById("btn-edit-save");
+  const btnDelete = document.getElementById("btn-edit-delete");
+  const deleteSpinner = document.getElementById("edit-delete-spinner");
+
+  if (btnSave) btnSave.disabled = true;
+  if (btnDelete) btnDelete.disabled = true;
+  if (deleteSpinner) deleteSpinner.classList.remove("hidden");
+
+  const payload = {
+    action: "deleteRecord",
+    rowId: record.rowId ? parseInt(record.rowId) : undefined,
+    date: record.date,
+    subcontractor: record.subcontractor,
+    workItem: record.workItem,
+    timestamp: record.timestamp
+  };
+
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      mode: "cors",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await res.json();
+    if (result.status === "success") {
+      alert("日報記錄已成功刪除！");
+
+      // 清空修改表單
+      const fieldsWrapper = document.getElementById("edit-fields-wrapper");
+      const recordSelect = document.getElementById("edit-record-select");
+      if (fieldsWrapper) fieldsWrapper.classList.add("hidden");
+      if (recordSelect) recordSelect.value = "";
+      clearRowHighlights();
+
+      // 重新整理資料庫與選單
+      await fetchRecords();
+      populateEditRecordDropdown();
+    } else {
+      throw new Error(result.message || "刪除失敗");
+    }
+  } catch (err) {
+    alert("刪除失敗，原因：" + err.message);
+  } finally {
+    if (btnSave) btnSave.disabled = false;
+    if (btnDelete) btnDelete.disabled = false;
+    if (deleteSpinner) deleteSpinner.classList.add("hidden");
+  }
+}
+
 
 
 

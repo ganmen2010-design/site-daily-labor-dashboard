@@ -10,7 +10,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <!-- FontAwesome CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="style.css?v=5.1">
+  <link rel="stylesheet" href="style.css?v=5.2">
 </head>
 <body>
   <!-- 背景發光球體，用於玻璃擬態效果 -->
@@ -62,6 +62,9 @@
               </button>
               <button type="button" class="form-tab-btn" id="btn-tab-batch">
                 <i class="fa-solid fa-paste"></i> 智慧批次寫入
+              </button>
+              <button type="button" class="form-tab-btn" id="btn-tab-edit">
+                <i class="fa-solid fa-pen-ruler"></i> 修改/刪除已報
               </button>
             </div>
             <button type="button" class="section-collapse-btn" id="btn-card-collapse-left" title="收合左側表單">
@@ -224,6 +227,106 @@
               <span class="spinner hidden" id="batch-spinner"></span>
             </button>
             <div id="batch-status-msg" class="batch-status-msg hidden"></div>
+          </div>
+        </div>
+
+        <!-- 修改 / 刪除已回報資料容器 (Tab 3) -->
+        <div id="edit-form-container" class="edit-form-container hidden">
+          <div class="edit-guide-banner">
+            <div class="guide-title"><i class="fa-solid fa-circle-info"></i> 資料維護操作說明</div>
+            <div class="guide-desc">請由下方選單選取欲維護之紀錄，或直接於右側明細表中點擊「✏️ 修改」，表單將自動帶入該筆資料供您編輯或刪除。</div>
+          </div>
+
+          <div class="form-group edit-record-selector-group">
+            <label for="edit-record-select"><i class="fa-solid fa-list-ol"></i> 選擇欲修改/刪除的日報記錄</label>
+            <select id="edit-record-select" class="edit-record-select">
+              <option value="">-- 請選擇欲維護之日報記錄 (共 0 筆) --</option>
+            </select>
+          </div>
+
+          <div id="edit-fields-wrapper" class="edit-fields-wrapper hidden">
+            <input type="hidden" id="edit-row-id">
+            <input type="hidden" id="edit-original-date">
+            <input type="hidden" id="edit-original-sub">
+            <input type="hidden" id="edit-original-work">
+            <input type="hidden" id="edit-timestamp">
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="edit-input-date"><i class="fa-solid fa-calendar-days"></i> 回報日期</label>
+                <input type="date" id="edit-input-date" required>
+              </div>
+              <div class="form-group">
+                <label for="edit-input-location"><i class="fa-solid fa-location-dot"></i> 工區位置</label>
+                <input type="text" id="edit-input-location" placeholder="工區位置…" required autocomplete="off">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="edit-input-subcontractor"><i class="fa-solid fa-building-user"></i> 廠商名稱</label>
+              <input type="text" id="edit-input-subcontractor" placeholder="廠商名稱…" required autocomplete="off">
+            </div>
+
+            <div class="form-group">
+              <label for="edit-input-workitem"><i class="fa-solid fa-list-check"></i> 施作工項</label>
+              <input type="text" id="edit-input-workitem" placeholder="施作工項…" required autocomplete="off">
+            </div>
+
+            <div class="form-group relative">
+              <label><i class="fa-solid fa-screwdriver-wrench"></i> 使用機具 (可複選)</label>
+              <div class="multi-select-container">
+                <div id="edit-multi-select-trigger" class="select-trigger-box">
+                  <span id="edit-selected-equipments-text">無</span>
+                  <i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div id="edit-multi-select-dropdown" class="select-dropdown-box hidden">
+                  <!-- JS dynamic render -->
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="edit-input-amcount"><i class="fa-solid fa-sun"></i> 上午出工數 (人)</label>
+                <input type="number" id="edit-input-amcount" min="0" value="0" required>
+              </div>
+              <div class="form-group">
+                <label for="edit-input-pmcount"><i class="fa-solid fa-moon"></i> 下午出工數 (人)</label>
+                <input type="number" id="edit-input-pmcount" min="0" value="0" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="edit-input-reporter"><i class="fa-solid fa-user-ninja"></i> 回報工程師</label>
+              <input type="text" id="edit-input-reporter" placeholder="工程師姓名…" required autocomplete="off">
+            </div>
+
+            <div class="form-group">
+              <label for="edit-input-notes"><i class="fa-solid fa-comment-dots"></i> 作業位置、部位、作業內容說明</label>
+              <textarea id="edit-input-notes" placeholder="輸入作業位置、部位、作業內容說明…" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="edit-input-checkitems"><i class="fa-solid fa-list-check"></i> 自檢及查驗事項</label>
+              <textarea id="edit-input-checkitems" placeholder="輸入自檢與查驗項目…" rows="2"></textarea>
+            </div>
+
+            <!-- 操作按鈕列 -->
+            <div class="edit-action-row">
+              <button type="button" class="btn-edit-save" id="btn-edit-save">
+                <span class="btn-text"><i class="fa-solid fa-floppy-disk"></i> 儲存修改內容</span>
+                <span class="spinner hidden" id="edit-save-spinner"></span>
+              </button>
+              <button type="button" class="btn-edit-delete" id="btn-edit-delete">
+                <span class="btn-text"><i class="fa-solid fa-trash-can"></i> 刪除此筆資料</span>
+                <span class="spinner hidden" id="edit-delete-spinner"></span>
+              </button>
+            </div>
+            <div class="edit-cancel-row">
+              <button type="button" class="btn-edit-cancel" id="btn-edit-cancel">
+                <i class="fa-solid fa-arrow-rotate-left"></i> 取消 / 清除選取
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -393,6 +496,7 @@
             <table class="data-table" id="data-table">
               <thead>
                 <tr>
+                  <th style="width: 85px; text-align: center;">操作</th>
                   <th>日期</th>
                   <th>工區</th>
                   <th>廠商名稱</th>
@@ -499,6 +603,6 @@
   <!-- 列印專用隱藏區域，匯出 PDF 時顯示 -->
   <div id="print-area"></div>
 
-  <script src="app.js?v=5.1"></script>
+  <script src="app.js?v=5.2"></script>
 </body>
 </html>
