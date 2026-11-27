@@ -949,8 +949,8 @@ function updateDashboard() {
     totalAm += r.amCount;
     totalPm += r.pmCount;
   });
-  const amHalf = totalAm * 0.5;
-  const pmHalf = totalPm * 0.5;
+  const amHalf = totalAm;
+  const pmHalf = totalPm;
   const totalHalf = amHalf + pmHalf;
   const totalFullDay = totalHalf / 2;
 
@@ -1056,8 +1056,8 @@ function renderTable(records) {
       <td><strong>${r.subcontractor}</strong></td>
       <td>${r.workItem}</td>
       <td><span class="text-cyan font-bold">${r.equipment || "無"}</span></td>
-      <td class="text-center font-bold text-cyan">${(r.amCount * 0.5).toFixed(1)}</td>
-      <td class="text-center font-bold text-orange">${(r.pmCount * 0.5).toFixed(1)}</td>
+      <td class="text-center font-bold text-cyan">${Number(r.amCount).toFixed(1)}</td>
+      <td class="text-center font-bold text-orange">${Number(r.pmCount).toFixed(1)}</td>
       <td><i class="fa-solid fa-cloud-sun text-yellow"></i> ${r.amWeather || "無"}</td>
       <td><i class="fa-solid fa-cloud-moon text-blue"></i> ${r.pmWeather || "無"}</td>
       <td>${r.reporter}</td>
@@ -1075,8 +1075,8 @@ function renderCharts(records) {
     if (!subData[r.subcontractor]) {
       subData[r.subcontractor] = { am: 0, pm: 0 };
     }
-    subData[r.subcontractor].am += r.amCount * 0.5;
-    subData[r.subcontractor].pm += r.pmCount * 0.5;
+    subData[r.subcontractor].am += r.amCount;
+    subData[r.subcontractor].pm += r.pmCount;
   });
 
   const subLabels = Object.keys(subData);
@@ -1123,7 +1123,7 @@ function renderCharts(records) {
 
   const itemData = {};
   records.forEach(r => {
-    const total = (r.amCount + r.pmCount) * 0.5;
+    const total = r.amCount + r.pmCount;
     if (total > 0) {
       itemData[r.workItem] = (itemData[r.workItem] || 0) + total;
     }
@@ -1691,7 +1691,7 @@ function handlePrintPdf() {
 
     filtered.forEach(r => {
       const sub = (r.subcontractor || "未填寫廠商").trim();
-      const totalWorkers = (Number(r.amCount) + Number(r.pmCount)) * 0.5;
+      const totalWorkers = Number(r.amCount) + Number(r.pmCount);
       grandTotalWorkers += totalWorkers;
 
       if (!subMap.has(sub)) {
@@ -1764,7 +1764,7 @@ function handlePrintPdf() {
   } else {
     // 單日模式 或 單一廠商時：每筆明細獨立顯示，不必合併！
     filtered.forEach(r => {
-      const totalWorkers = (Number(r.amCount) + Number(r.pmCount)) * 0.5;
+      const totalWorkers = Number(r.amCount) + Number(r.pmCount);
       grandTotalWorkers += totalWorkers;
 
       // 若為期間模式下的單一廠商，廠商欄位標註日期以便區分
